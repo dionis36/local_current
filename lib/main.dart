@@ -5,8 +5,13 @@ import 'package:provider/provider.dart';
 import 'package:weather_app/pages/main_screen.dart'; // Assuming this is your main UI page
 import 'package:weather_app/services/weather_provider.dart'; // Your WeatherProvider
 import 'package:weather_app/theme/theme_provider.dart'; // Your ThemeProvider
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-void main() {
+
+// This asynchronous main function is required to load the .env file
+Future<void> main() async {
+  // Wait for the .env file to be loaded
+  await dotenv.load(fileName: ".env");
   runApp(
     MultiProvider(
       providers: [
