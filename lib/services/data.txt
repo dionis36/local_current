@@ -1,0 +1,236 @@
+
+// // Filename: main.dart
+// import 'dart:io';
+// import 'dart:convert';
+// import 'package:http/http.dart' as http;
+// import 'package:weather_app/models/condition_icon_codes.dart';
+// import 'package:weather_app/models/weather_data.dart';
+// import 'package:weather_app/services/weather_service.dart';
+
+
+
+// /// The main entry point of the application.
+// void main() async {
+//   // Create an instance of the WeatherService.
+//   // The API key is already set in the WeatherService class.
+//   final WeatherService weatherService = WeatherService();
+
+//   // The city name is now hardcoded for demonstration purposes.
+//   // Change this to any city you want.
+//   final String cityName = 'rome';
+
+//   print('\nFetching weather data for $cityName...');
+
+//   try {
+//     // Step 1: Search for the location to validate the input.
+//     final List<Map<String, dynamic>> locations = await weatherService.searchLocation(cityName);
+
+//     // Check if any locations were found.
+//     if (locations.isEmpty) {
+//       print('Location "$cityName" not found. Please check your spelling and try again.');
+//       return;
+//     }
+
+//     // Use the first location from the search results for the full weather report.
+//     final String validLocation = locations.first['name'];
+//     // Access the country and country code from the location search results.
+//     // Use the null-aware operator (??) to provide a default value if the data is null.
+//     final String country = locations.first['country'] ?? 'N/A';
+//     final String countryCode = locations.first['country_code'] ?? 'N/A';
+
+//     print('Found location: $validLocation, $country ($countryCode)');
+
+//     // Step 2: Fetch the comprehensive weather data for the valid location.
+//     final Map<String, dynamic> weatherDataJson = await weatherService.fetchWeather(validLocation);
+
+//     // Step 3: Fetch historical weather data for yesterday.
+//     final DateTime yesterday = DateTime.now().subtract(Duration(days: 1));
+//     final String yesterdayDate = '${yesterday.year}-${yesterday.month.toString().padLeft(2, '0')}-${yesterday.day.toString().padLeft(2, '0')}';
+//     final Map<String, dynamic> historicalDataJson = await weatherService.fetchHistory(validLocation, yesterdayDate);
+
+//     // Extracting all the data points from the JSON response.
+//     final Map<String, dynamic> current = weatherDataJson['current'];
+//     final Map<String, dynamic> location = weatherDataJson['location'];
+//     final Map<String, dynamic> forecastDay = weatherDataJson['forecast']['forecastday'][0];
+//     final Map<String, dynamic> astro = forecastDay['astro'];
+
+//     // Parse the hourly forecast data.
+//     List<HourlyForecast> hourlyForecast = [];
+//     final List<dynamic> hourlyList = forecastDay['hour'];
+//     for (var item in hourlyList) {
+//       hourlyForecast.add(
+//         HourlyForecast(
+//           time: item['time'].toString().substring(11, 16),
+//           temperature: item['temp_c'].toDouble(),
+//           condition: item['condition']['text'],
+//           precipitationChance: item['chance_of_rain'].toInt(),
+//           uvIndex: item['uv'].toDouble(),
+//         ),
+//       );
+//     }
+
+//     // Parse the daily forecast data.
+//     List<DailyForecast> dailyForecast = [];
+//     final List<dynamic> dailyList = weatherDataJson['forecast']['forecastday'];
+//     for (var item in dailyList) {
+//       dailyForecast.add(
+//         DailyForecast(
+//           date: item['date'],
+//           maxTemp: item['day']['maxtemp_c'].toDouble(),
+//           minTemp: item['day']['mintemp_c'].toDouble(),
+//           condition: item['day']['condition']['text'],
+//           precipitation: item['day']['totalprecip_mm'].toDouble(),
+//           humidity: item['day']['avghumidity'].toDouble(),
+//           uvIndex: item['day']['uv'].toDouble(),
+//         ),
+//       );
+//     }
+
+//     // Parse the historical data.
+//     final Map<String, dynamic> historyDay = historicalDataJson['forecast']['forecastday'][0];
+//     final List<HistoricalHourlyForecast> historicalHourly = [];
+//     final List<dynamic> historyHourList = historyDay['hour'];
+//     for (var item in historyHourList) {
+//       historicalHourly.add(
+//         HistoricalHourlyForecast(
+//           time: item['time'].toString().substring(11, 16),
+//           temperature: item['temp_c'].toDouble(),
+//           condition: item['condition']['text'],
+//           precipitation: item['precip_mm'].toDouble(),
+//         ),
+//       );
+//     }
+
+//     final HistoricalDailyForecast historicalDaily = HistoricalDailyForecast(
+//       date: historyDay['date'],
+//       maxTemp: historyDay['day']['maxtemp_c'].toDouble(),
+//       minTemp: historyDay['day']['mintemp_c'].toDouble(),
+//       condition: historyDay['day']['condition']['text'],
+//       precipitation: historyDay['day']['totalprecip_mm'].toDouble(),
+//       humidity: historyDay['day']['avghumidity'].toDouble(),
+//     );
+
+//     final HistoricalData historicalData = HistoricalData(
+//       hourly: historicalHourly,
+//       daily: historicalDaily,
+//     );
+
+//     // Create the WeatherData object.
+//     final WeatherData weatherData = WeatherData(
+//       location: location['name'],
+//       temperature: current['temp_c'].toDouble(),
+//       condition: current['condition']['text'],
+//       // icon: current['condition']['icon'],
+//       icon: getIconCodeFromConditionCode(current['condition']['code']),
+//       humidity: current['humidity'].toDouble(),
+//       pressure: current['pressure_mb'].toDouble(),
+//       visibility: current['vis_km'].toDouble(),
+//       precipitation: current['precip_mm'].toDouble(),
+//       windSpeed: current['wind_kph'].toDouble(),
+//       windDirection: current['wind_dir'],
+//       uvIndex: current['uv'].toDouble(),
+//       uvDescription: _getUvDescription(current['uv'].toDouble()),
+//       feelsLike: current['feelslike_c'].toDouble(),
+//       dewPoint: 0.0, // Not available in this API
+//       sunrise: astro['sunrise'],
+//       sunset: astro['sunset'],
+//       moonPhase: astro['moon_phase'],
+//       moonIllumination: astro['moon_illumination'],
+//       moonset: astro['moonset'],
+//       daysToFullMoon: _calculateDaysToFullMoon(astro['moon_phase']),
+//       hourlyForecast: hourlyForecast,
+//       dailyForecast: dailyForecast,
+//       historicalData: historicalData,
+//     );
+
+//     // Print the retrieved weather data.
+//     print('\n--- Current Weather Details ---');
+//     print('Your current time: ${_formatTime(DateTime.now())}');
+//     print('City local time: ${location['localtime'].toString().substring(11, 16)}');
+//     // Now also print the country from the main location object
+//     print('Location: ${weatherData.location}, ${location['country']}');
+//     print('Temperature: ${weatherData.temperature.toStringAsFixed(1)}°C');
+//     print('Condition: ${weatherData.condition}');
+//     print('Feels Like: ${weatherData.feelsLike.toStringAsFixed(1)}°C');
+//     print('Humidity: ${weatherData.humidity.toStringAsFixed(0)}%');
+//     print('Wind Speed: ${weatherData.windSpeed.toStringAsFixed(1)} km/h');
+//     print('Wind Direction: ${weatherData.windDirection}');
+//     print('Pressure: ${weatherData.pressure.toStringAsFixed(0)} hPa');
+//     print('Sunrise: ${weatherData.sunrise}');
+//     print('Sunset: ${weatherData.sunset}');
+//     print('Visibility: ${weatherData.visibility} km');
+//     print('Precipitation (last 1h): ${weatherData.precipitation} mm');
+//     print('UV Index: ${weatherData.uvIndex.toStringAsFixed(1)} (${weatherData.uvDescription})');
+//     print('Moon Phase: ${weatherData.moonPhase}');
+//     print('Moon Illumination: ${weatherData.moonIllumination}%');
+//     print('Days to Full Moon: ${weatherData.daysToFullMoon}');
+
+//     print('\n--- Hourly Forecast (24h) ---');
+//     for (var forecast in weatherData.hourlyForecast) {
+//       print('Time: ${forecast.time}, Temp: ${forecast.temperature.toStringAsFixed(1)}°C, Condition: ${forecast.condition}, Chance of Precip: ${forecast.precipitationChance}%, UV: ${forecast.uvIndex.toStringAsFixed(1)}');
+//     }
+
+//     print('\n--- Daily Forecast (14-Day) ---');
+//     for (var forecast in weatherData.dailyForecast) {
+//       print('Date: ${forecast.date}, High: ${forecast.maxTemp.toStringAsFixed(1)}°C, Low: ${forecast.minTemp.toStringAsFixed(1)}°C, Condition: ${forecast.condition}, Precip: ${forecast.precipitation}mm, Humidity: ${forecast.humidity.toStringAsFixed(0)}%, UV: ${forecast.uvIndex.toStringAsFixed(1)}');
+//     }
+
+//     print('\n--- Historical Data (Yesterday) ---');
+//     print('Date: ${weatherData.historicalData!.daily.date}');
+//     print('Daily High: ${weatherData.historicalData!.daily.maxTemp.toStringAsFixed(1)}°C');
+//     print('Daily Low: ${weatherData.historicalData!.daily.minTemp.toStringAsFixed(1)}°C');
+//     print('Condition: ${weatherData.historicalData!.daily.condition}');
+//     print('Total Precipitation: ${weatherData.historicalData!.daily.precipitation.toStringAsFixed(2)} mm');
+
+//     print('\n--- Historical Hourly Data (Yesterday) ---');
+//     for (var hour in weatherData.historicalData!.hourly) {
+//       print('Time: ${hour.time}, Temp: ${hour.temperature.toStringAsFixed(1)}°C, Condition: ${hour.condition}, Precip: ${hour.precipitation.toStringAsFixed(2)} mm');
+//     }
+
+//   } catch (e) {
+//     // Print any errors that occur during the API calls.
+//     print('Error: $e');
+//   }
+// }
+
+// // Helper function to format a DateTime to a simple time string.
+// String _formatTime(DateTime time) {
+//   final String hour = time.hour.toString().padLeft(2, '0');
+//   final String minute = time.minute.toString().padLeft(2, '0');
+//   return '$hour:$minute';
+// }
+
+// // Helper function to get a description for the UV index.
+// String _getUvDescription(double uv) {
+//   if (uv <= 2) return 'Low';
+//   if (uv <= 5) return 'Moderate';
+//   if (uv <= 7) return 'High';
+//   if (uv <= 10) return 'Very High';
+//   return 'Extreme';
+// }
+
+// // Placeholder function to calculate days to a full moon based on the phase.
+// // This is a simplification and would require more complex calculations for a precise app.
+// int _calculateDaysToFullMoon(String moonPhase) {
+//   switch (moonPhase) {
+//     case 'New Moon':
+//       return 15;
+//     case 'Waxing Crescent':
+//       return 10;
+//     case 'First Quarter':
+//       return 7;
+//     case 'Waxing Gibbous':
+//       return 3;
+//     case 'Full Moon':
+//       return 0;
+//     case 'Waning Gibbous':
+//       return 3;
+//     case 'Last Quarter':
+//       return 7;
+//     case 'Waning Crescent':
+//       return 10;
+//     default:
+//       return -1;
+//   }
+// }
+
